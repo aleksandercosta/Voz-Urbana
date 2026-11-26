@@ -1,0 +1,696 @@
+{
+  "info": {
+    "name": "VozUrbana_AV2_Collection",
+    "description": "Aula 15 - JWT automático, DTOs, Projections e CRUD de Denúncias. Execute na ordem para criar usuário/relator/denúncia e reutilizar IDs e Bearer automaticamente.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "host",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "authorization_token",
+      "value": ""
+    },
+    {
+      "key": "usuario_email",
+      "value": "aluno.av2@example.com"
+    },
+    {
+      "key": "usuario_senha",
+      "value": "123456"
+    },
+    {
+      "key": "usuario_cpf",
+      "value": "98765432104"
+    },
+    {
+      "key": "usuario_id",
+      "value": ""
+    },
+    {
+      "key": "relator_id",
+      "value": ""
+    },
+    {
+      "key": "denuncia_id",
+      "value": ""
+    },
+    {
+      "key": "outro_usuario_id",
+      "value": ""
+    },
+    {
+      "key": "admin_email",
+      "value": ""
+    },
+    {
+      "key": "admin_senha",
+      "value": ""
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{authorization_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "01 - Auth",
+      "item": [
+        {
+          "name": "01 Cadastro (POST público)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{host}}/usuario",
+              "host": [
+                "{{host}}"
+              ],
+              "path": [
+                "usuario"
+              ]
+            },
+            "description": "Se repetir a execução, mude usuario_email e usuario_cpf para dados fictícios novos.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Aluno AV2\",\n  \"email\": \"{{usuario_email}}\",\n  \"senha\": \"{{usuario_senha}}\",\n  \"cpf\": \"{{usuario_cpf}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Cadastro 201', () => pm.response.to.have.status(201));",
+                  "if (pm.response.code === 201) {",
+                  "  const body = pm.response.json();",
+                  "  pm.collectionVariables.set('usuario_id', body.idUsuario);",
+                  "  pm.test('Resposta sem dados sensíveis', () => {",
+                  "    pm.expect(body).not.to.have.property('senha');",
+                  "    pm.expect(body).not.to.have.property('cpf');",
+                  "    pm.expect(body).not.to.have.property('profiles');",
+                  "  });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 Login → salvar JWT automático",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{host}}/login",
+              "host": [
+                "{{host}}"
+              ],
+              "path": [
+                "login"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{usuario_email}}\",\n  \"password\": \"{{usuario_senha}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Login retornou 200', () => pm.response.to.have.status(200));",
+                  "const authHeader = pm.response.headers.get('Authorization');",
+                  "const json = pm.response.json();",
+                  "const token = (authHeader && authHeader.startsWith('Bearer ') ? authHeader.substring(7) : json.token);",
+                  "pm.test('Token retornado', () => pm.expect(token).to.be.a('string').and.not.empty);",
+                  "if (token) pm.collectionVariables.set('authorization_token', token);",
+                  "console.log('Token JWT salvo na variável authorization_token (não compartilhe o valor).');"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "02 - Usuários (protegidos)",
+      "item": [
+        {
+          "name": "03 Meu perfil - DTO",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{host}}/usuario/me",
+              "host": [
+                "{{host}}"
+              ],
+              "path": [
+                "usuario",
+                "me"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('Não expõe senha/CPF/perfis internos', () => {",
+                  "  pm.expect(body).not.to.have.property('senha');",
+                  "  pm.expect(body).not.to.have.property('cpf');",
+                  "  pm.expect(body).not.to.have.property('profiles');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "04 Meus dados - Projection",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{host}}/usuario/user",
+              "host": [
+                "{{host}}"
+              ],
+              "path": [
+                "usuario",
+                "user"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 e lista', () => { pm.response.to.have.status(200); pm.expect(pm.response.json()).to.be.an('array'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "05 Buscar meu ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{host}}/usuario/{{usuario_id}}",
+              "host": [
+                "{{host}}"
+              ],
+              "path": [
+                "usuario",
+                "{{usuario_id}}"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('Não expõe senha/CPF/perfis internos', () => {",
+                  "  pm.expect(body).not.to.have.property('senha');",
+                  "  pm.expect(body).not.to.have.property('cpf');",
+                  "  pm.expect(body).not.to.have.property('profiles');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "03 - Relator",
+      "item": [
+        {
+          "name": "06 Criar relator para o usuário autenticado",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{host}}/relator",
+              "host": [
+                "{{host}}"
+              ],
+              "path": [
+                "relator"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Aluno AV2\",\n  \"cpf\": \"{{usuario_cpf}}\",\n  \"cidade\": \"Palhoça\",\n  \"estado\": \"SC\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Criar relator 200', () => pm.response.to.have.status(200));",
+                  "if (pm.response.code === 200) pm.collectionVariables.set('relator_id', pm.response.json().idRelator);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "04 - Denúncias (CRUD completo)",
+      "item": [
+        {
+          "name": "07 Criar denúncia (POST)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{host}}/denuncia",
+              "host": [
+                "{{host}}"
+              ],
+              "path": [
+                "denuncia"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idRelator\": {{relator_id}},\n  \"titulo\": \"Buraco na rua\",\n  \"descricao\": \"Buraco grande próximo à calçada.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 denúncia criada', () => pm.response.to.have.status(201));",
+                  "if (pm.response.code === 201) pm.collectionVariables.set('denuncia_id', pm.response.json().idDenuncia);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "08 Listar minhas denúncias (GET projection)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{host}}/denuncia/user",
+              "host": [
+                "{{host}}"
+              ],
+              "path": [
+                "denuncia",
+                "user"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 e lista própria', () => { pm.response.to.have.status(200); pm.expect(pm.response.json()).to.be.an('array'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "09 Buscar denúncia por ID (GET)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{host}}/denuncia/{{denuncia_id}}",
+              "host": [
+                "{{host}}"
+              ],
+              "path": [
+                "denuncia",
+                "{{denuncia_id}}"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 denúncia encontrada', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "10 Atualizar denúncia (PUT)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{host}}/denuncia/{{denuncia_id}}",
+              "host": [
+                "{{host}}"
+              ],
+              "path": [
+                "denuncia",
+                "{{denuncia_id}}"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"titulo\": \"Buraco na rua - atualizado\",\n  \"descricao\": \"A situação piorou após a chuva.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 atualizada', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "11 Excluir denúncia (DELETE)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{host}}/denuncia/{{denuncia_id}}",
+              "host": [
+                "{{host}}"
+              ],
+              "path": [
+                "denuncia",
+                "{{denuncia_id}}"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('204 excluída', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "05 - Segurança (testes separados)",
+      "item": [
+        {
+          "name": "Sem token → 401",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{host}}/usuario/me",
+              "host": [
+                "{{host}}"
+              ],
+              "path": [
+                "usuario",
+                "me"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('401 sem JWT', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Token alterado → 401",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{host}}/usuario/me",
+              "host": [
+                "{{host}}"
+              ],
+              "path": [
+                "usuario",
+                "me"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "token.invalido.assinatura",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('401 com JWT inválido', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "USER consulta outro ID → 403",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{host}}/usuario/{{outro_usuario_id}}",
+              "host": [
+                "{{host}}"
+              ],
+              "path": [
+                "usuario",
+                "{{outro_usuario_id}}"
+              ]
+            },
+            "description": "Configure outro_usuario_id com um usuário existente diferente do usuário logado."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('403 usuário diferente', () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login ADMIN → substituir JWT",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{host}}/login",
+              "host": [
+                "{{host}}"
+              ],
+              "path": [
+                "login"
+              ]
+            },
+            "description": "Use um ADMIN existente. Este login substitui authorization_token da collection.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{admin_email}}\",\n  \"password\": \"{{admin_senha}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Login retornou 200', () => pm.response.to.have.status(200));",
+                  "const authHeader = pm.response.headers.get('Authorization');",
+                  "const json = pm.response.json();",
+                  "const token = (authHeader && authHeader.startsWith('Bearer ') ? authHeader.substring(7) : json.token);",
+                  "pm.test('Token retornado', () => pm.expect(token).to.be.a('string').and.not.empty);",
+                  "if (token) pm.collectionVariables.set('authorization_token', token);",
+                  "console.log('Token JWT salvo na variável authorization_token (não compartilhe o valor).');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "ADMIN consulta outro ID → 200",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{host}}/usuario/{{outro_usuario_id}}",
+              "host": [
+                "{{host}}"
+              ],
+              "path": [
+                "usuario",
+                "{{outro_usuario_id}}"
+              ]
+            },
+            "description": "Executar após fazer login como ADMIN."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('Não expõe senha/CPF/perfis internos', () => {",
+                  "  pm.expect(body).not.to.have.property('senha');",
+                  "  pm.expect(body).not.to.have.property('cpf');",
+                  "  pm.expect(body).not.to.have.property('profiles');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
